@@ -1,4 +1,4 @@
-# BatchGenie
+# BatchGenie （批量精灵）
 
 [English](#english) | [中文](#中文)
 
