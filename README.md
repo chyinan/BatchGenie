@@ -15,9 +15,10 @@ BatchGenie 是一个强大的文件批处理工具，支持自然语言命令操
 ## 安装说明
 
 1. 克隆仓库：
-bash
+```bash
 git clone https://github.com/chyinan/BatchGenie.git
 cd BatchGenie
+```
 
 2. 安装依赖：
 ```bash
