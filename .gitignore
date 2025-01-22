@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# 配置文件（包含敏感信息）
+config.py
+
+# 系统文件
+.DS_Store
+Thumbs.db 
