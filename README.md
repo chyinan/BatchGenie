@@ -76,7 +76,7 @@ python main.py
 - 使用前建议备份重要文件
 - AI 功能需要有效的 Google Gemini API Key
 - 确保有足够的磁盘权限
-- 首次使用时可能需要科学上网
+- 使用时可能需要科学上网
 
 ---
 
@@ -155,7 +155,6 @@ python main.py
 - It's recommended to back up important files before use
 - AI features require a valid Google Gemini API Key
 - Ensure sufficient disk permissions
-- You may need to use a VPN for the first time
 
 ## Requirements
 
