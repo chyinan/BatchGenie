@@ -16,6 +16,13 @@ genai.configure(api_key=GEMINI_API_KEY)
 # 获取模型
 model = genai.GenerativeModel('gemini-pro')
 
+# 获取当前用户的主目录
+USER_HOME = Path.home()
+DOCUMENTS_PATH = USER_HOME / "Documents"
+MUSIC_PATH = USER_HOME / "Music"
+PICTURES_PATH = USER_HOME / "Pictures"
+DESKTOP_PATH = USER_HOME / "Desktop"
+
 MESSAGES = {
     'zh': {
         'connecting': "正在连接 AI 服务...",
@@ -115,6 +122,14 @@ class FileOperation:
             print(f"执行错误: {str(e)}")
             return False
 
+def replace_placeholders(prompt):
+    """替换用户目录的占位符为实际路径"""
+    prompt = prompt.replace("桌面", str(DESKTOP_PATH))
+    prompt = prompt.replace("文档", str(DOCUMENTS_PATH))
+    prompt = prompt.replace("音乐", str(MUSIC_PATH))
+    prompt = prompt.replace("图片", str(PICTURES_PATH))
+    return prompt
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=4, max=10),
@@ -123,8 +138,11 @@ class FileOperation:
 def get_ai_response(prompt, lang='zh'):
     """获取 AI 响应，带重试机制"""
     try:
+        # 替换用户目录的占位符
+        prompt = replace_placeholders(prompt)
+        
         system_prompt = f"""你是一个文件管理助手。请分析用户的需求并返回结构化的 JSON 响应。
-需要返回具体的文件操作步骤，每个步骤包含操作类型和相关参数。请确保返回的 JSON 格式完整且正确。
+需要返回具体的文件操作步骤，每个步骤包含操作类型和相关参数。
 
 支持的操作类型：
 - rename: 重命名文件（需要 source_path 和 target_path）
@@ -147,11 +165,6 @@ def get_ai_response(prompt, lang='zh'):
         }}
     ]
 }}
-
-注意：
-1. 所有路径必须是完整的绝对路径
-2. Windows 系统中路径分隔符可以用 / 或 \\
-3. 创建文件时必须指定文件扩展名
 
 用户的请求是: {prompt}"""
 
@@ -219,6 +232,9 @@ def interpret_and_execute(prompt, lang='zh'):
         except json.JSONDecodeError as e:
             print(f"AI 响应解析失败: {str(e)}")
             print(f"原始响应: {response}")
+            # 输出 AI 报错原因
+            if "错误输入" in response:
+                print("AI 报错原因: 输入的指令无法被理解或处理。请检查输入的格式和内容。")
         except Exception as e:
             print(msg['operation_failed'].format(str(e)))
             
