@@ -2,18 +2,20 @@ import sys
 from modules.ai_controller import interpret_and_execute
 from modules.renamer import batch_rename
 from modules.converter import batch_convert
+from modules.audio_classifier import classify_audio_by_samplerate
 
 # 语言配置
 MESSAGES = {
     'zh': {
-        'select_language': '\n请选择你的语言 / Please select your language:',
+        'select_language': '\n请选择你的1语言 / Please select your language:',
         'language_options': '1. 中文\n2. English',
         'welcome': '\n欢迎使用 BatchGenie!',
         'menu_title': '请选择操作：',
         'menu_rename': '1. 批量重命名',
-        'menu_convert': '2. 批量格式转换',
+        'menu_convert': '2. 批量格式重命名',
         'menu_ai': '3. 使用 AI 模型解析自然语言命令',
-        'menu_exit': '4. 退出',
+        'menu_audio': '4. 按采样率分类音频文件',
+        'menu_exit': '5. 退出',
         'input_choice': '输入选项编号：',
         'input_folder': '请输入文件夹路径：',
         'input_prefix': '请输入新文件名前缀：',
@@ -27,9 +29,10 @@ MESSAGES = {
         'welcome': '\nWelcome to BatchGenie!',
         'menu_title': 'Please select an operation:',
         'menu_rename': '1. Batch Rename',
-        'menu_convert': '2. Batch Format Conversion',
+        'menu_convert': '2. Batch Format Rename',
         'menu_ai': '3. Use AI Model to Process Natural Language Commands',
-        'menu_exit': '4. Exit',
+        'menu_audio': '4. Classify Audio Files by Sample Rate',
+        'menu_exit': '5. Exit',
         'input_choice': 'Enter option number: ',
         'input_folder': 'Enter folder path: ',
         'input_prefix': 'Enter new filename prefix: ',
@@ -60,6 +63,7 @@ def main():
         print(msg['menu_rename'])
         print(msg['menu_convert'])
         print(msg['menu_ai'])
+        print(msg['menu_audio'])
         print(msg['menu_exit'])
 
         choice = input(msg['input_choice'])
@@ -74,6 +78,9 @@ def main():
             prompt = input(msg['input_command'])
             interpret_and_execute(prompt, lang)
         elif choice == "4":
+            folder = input(msg['input_folder'])
+            classify_audio_by_samplerate(folder)
+        elif choice == "5":
             print(msg['goodbye'])
             sys.exit(0)
         else:

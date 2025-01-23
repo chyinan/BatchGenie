@@ -1,3 +1,5 @@
 openai>=1.0.0
 Pillow>=9.0.0
 tenacity>=8.0.0  # 用于重试机制
+soundfile>=0.12.1  # 用于读取音频文件
+mutagen>=1.47.0  # 用于读取 M4A 和 DSD 文件格式
