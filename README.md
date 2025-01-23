@@ -114,7 +114,7 @@ pip install -r requirements.txt
 ```
 
 3. Configuration:
-   - Copy `config.example.py` to `config.py`
+   - Rename `config.example.py` to `config.py`
    - Obtain your Google Gemini API Key:
      1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
      2. Log in to your Google account
