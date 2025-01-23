@@ -13,7 +13,7 @@ from modules.audio_classifier import classify_audio_by_samplerate
 # 语言配置
 MESSAGES = {
     'zh': {
-        'select_language': '\n请选择你的1语言 / Please select your language:',
+        'select_language': '\n请选择你的语言 / Please select your language:',
         'language_options': '1. 中文\n2. English',
         'welcome': '\n欢迎使用 BatchGenie!',
         'menu_title': '请选择操作：',
