@@ -15,30 +15,27 @@ MESSAGES = {
     }
 }
 
-def batch_rename(folder_path, prefix, lang='zh'):
-    """
-    批量重命名指定文件夹中的文件
-    
-    Args:
-        folder_path (str): 文件夹路径
-        prefix (str): 新文件名前缀
-    """
-    msg = MESSAGES[lang]
+def batch_rename(files, prefix=''):
+    """批量重命名文件，添加指定前缀"""
     try:
-        if not os.path.exists(folder_path):
-            print(msg['folder_not_exist'].format(folder_path))
-            return
+        results = []
+        for file_path in files:
+            if not os.path.exists(file_path):
+                continue
+                
+            # 获取文件目录和文件名
+            directory = os.path.dirname(file_path)
+            filename = os.path.basename(file_path)
             
-        files = os.listdir(folder_path)
-        for filename in files:
-            old_path = os.path.join(folder_path, filename)
-            if os.path.isfile(old_path):
-                # 保持原文件名，只在前面添加前缀
-                new_filename = f"{prefix}{filename}"
-                new_path = os.path.join(folder_path, new_filename)
-                os.rename(old_path, new_path)
-                print(msg['renamed'].format(filename, new_filename))
-        
-        print(msg['rename_complete'])
+            # 构建新文件名（添加前缀）
+            new_filename = f"{prefix}{filename}"
+            new_filepath = os.path.join(directory, new_filename)
+            
+            # 重命名文件
+            os.rename(file_path, new_filepath)
+            results.append((file_path, new_filepath))
+            
+        return results
     except Exception as e:
-        print(msg['error'].format(str(e)))
+        print(f"重命名操作失败: {str(e)}")
+        raise

@@ -9,6 +9,7 @@ import google.generativeai as genai
 from modules.renamer import batch_rename
 from modules.converter import batch_convert
 from config import GEMINI_API_KEY
+import glob  # 添加这个导入
 
 # 配置 Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -140,38 +141,59 @@ def get_ai_response(prompt, lang='zh'):
     try:
         # 替换用户目录的占位符
         prompt = replace_placeholders(prompt)
-        
+
+        # 检查输入是否有效
+        if not prompt or prompt.strip() == "":
+            raise ValueError("输入的提示不能为空。")
+
+        print(f"输入的提示: '{prompt}'")  # 调试输出
+
         system_prompt = f"""你是一个文件管理助手。请分析用户的需求并返回结构化的 JSON 响应。
-需要返回具体的文件操作步骤，每个步骤包含操作类型和相关参数。
-
-支持的操作类型：
-- rename: 重命名文件（需要 source_path 和 target_path）
-- move: 移动文件（需要 source_path 和 target_path）
-- copy: 复制文件（需要 source_path 和 target_path）
-- delete: 删除文件（需要 source_path）
-- create_dir: 创建目录（需要 source_path）
-- create_file: 创建文件（需要 source_path 和可选的 content 参数）
-
-响应格式示例：
-{{
-    "description": "操作说明",
-    "operations": [
+        以下是返回格式的示例：
         {{
-            "type": "create_file",
-            "source_path": "完整的文件路径，如 C:/Users/username/Desktop/test.txt",
-            "parameters": {{
-                "content": "文件内容"
-            }}
+            "operation": "add_prefix",
+            "files": [
+                "C:/path/to/*.txt"
+            ],
+            "prefix": "PREFIX_",
+            "description": "为指定文件添加前缀"
         }}
-    ]
-}}
-
-用户的请求是: {prompt}"""
-
+        
+        注意：
+        1. 对于批量操作，请使用通配符（如 *.txt）来匹配文件
+        2. 返回的 JSON 中不要包含任何注释
+        3. 确保返回的是标准的 JSON 格式
+        
+        用户的请求是: {prompt}
+        请确保返回的内容是有效的 JSON 格式，不要包含任何 Markdown 代码块标记或注释。"""
+        
         response = model.generate_content(system_prompt)
-        return response.text
+        response_text = response.text
+        
+        # 清理响应文本，移除可能的 Markdown 代码块标记
+        if response_text.startswith('```'):
+            response_text = response_text.split('\n', 1)[1]
+        if response_text.endswith('```'):
+            response_text = response_text.rsplit('\n', 1)[0]
+        if response_text.startswith('json'):
+            response_text = response_text.split('\n', 1)[1]
+            
+        # 移除任何行内注释
+        response_lines = response_text.split('\n')
+        cleaned_lines = []
+        for line in response_lines:
+            comment_index = line.find('#')
+            if comment_index != -1:
+                line = line[:comment_index].rstrip()
+            cleaned_lines.append(line)
+        response_text = '\n'.join(cleaned_lines)
+            
+        print(f"原始响应: {response_text}")  # 调试输出
+        return response_text
+            
     except Exception as e:
         print(MESSAGES[lang]['network_error'])
+        print(f"详细错误信息: {str(e)}")  # 输出详细错误信息
         raise
 
 def interpret_and_execute(prompt, lang='zh'):
@@ -188,33 +210,38 @@ def interpret_and_execute(prompt, lang='zh'):
             result = json.loads(response)
             print(f"{msg['ai_result']}\n{result['description']}")
             
-            # 创建操作列表
-            operations = []
-            for op in result['operations']:
-                # 确保必要的字段存在
-                if 'type' not in op or 'source_path' not in op:
-                    print(f"无效的操作配置: {op}")
-                    continue
-                    
-                operations.append(FileOperation(
-                    operation_type=op['type'],
-                    source_path=op['source_path'],
-                    target_path=op.get('target_path'),  # 可选字段
-                    parameters=op.get('parameters', {})
-                ))
+            # 获取操作类型和参数
+            operation = result.get('operation')
+            file_patterns = result.get('files', [])
+            prefix = result.get('prefix', '')
             
-            # 预览将要执行的操作
+            # 展开通配符，获取实际的文件列表
+            files = []
+            for pattern in file_patterns:
+                # 将路径分隔符统一为系统风格
+                pattern = pattern.replace('/', os.path.sep)
+                # 展开通配符
+                matched_files = glob.glob(pattern)
+                files.extend(matched_files)
+            
+            # 显示将要执行的操作
             print(msg['affected_files'])
             affected_files = []
-            for op in operations:
-                affected_files.extend(op.preview())
+            
+            if operation == 'add_prefix' and files and prefix:
+                for file_path in files:
+                    new_name = os.path.join(
+                        os.path.dirname(file_path),
+                        f"{prefix}{os.path.basename(file_path)}"
+                    )
+                    affected_files.append(f"- {file_path} -> {new_name}")
             
             if not affected_files:
                 print(msg['no_files_affected'])
                 return
                 
             for file in affected_files:
-                print(f"- {file}")
+                print(file)
             
             # 请求用户确认
             if input(msg['confirm_execute']).lower() != 'y':
@@ -222,9 +249,9 @@ def interpret_and_execute(prompt, lang='zh'):
                 return
             
             # 执行操作
-            for op in operations:
-                if not op.execute():
-                    print(msg['operation_failed'].format(op.type))
+            if operation == 'add_prefix':
+                if not process_files(files, 'rename', prefix):
+                    print(msg['operation_failed'].format(operation))
                     return
             
             print(msg['operation_completed'])
@@ -232,11 +259,58 @@ def interpret_and_execute(prompt, lang='zh'):
         except json.JSONDecodeError as e:
             print(f"AI 响应解析失败: {str(e)}")
             print(f"原始响应: {response}")
-            # 输出 AI 报错原因
-            if "错误输入" in response:
-                print("AI 报错原因: 输入的指令无法被理解或处理。请检查输入的格式和内容。")
-        except Exception as e:
-            print(msg['operation_failed'].format(str(e)))
             
     except Exception as e:
         print(msg['processing_error'].format(str(e)))
+
+def process_files(files, operation, prefix=''):
+    """处理文件操作"""
+    try:
+        if operation == 'rename':
+            # 确保前缀不为空且为字符串类型
+            if not isinstance(prefix, str):
+                raise ValueError("前缀必须是字符串类型")
+            if not prefix:
+                raise ValueError("前缀不能为空")
+                
+            try:
+                # 直接执行重命名操作，不再请求确认
+                results = batch_rename(files, prefix)
+                return results
+            except Exception as e:
+                print(f"执行错误: {str(e)}")
+                raise
+        # ... 其他操作代码 ...
+    except Exception as e:
+        print(f"操作失败: {str(e)}")
+        raise
+
+def process_command(command, lang='zh'):
+    """处理 AI 指令"""
+    try:
+        # 获取 AI 响应
+        response = get_ai_response(command, lang)
+        
+        # 解析响应
+        if isinstance(response, str):
+            try:
+                response_json = json.loads(response)
+            except json.JSONDecodeError:
+                print("AI 响应格式错误")
+                return
+
+        # 获取操作类型和参数
+        operation = response_json.get('operation')
+        files = response_json.get('files', [])
+        prefix = response_json.get('prefix', '')
+        
+        # 检查操作类型
+        if operation == 'add_prefix' and files and prefix:
+            return process_files(files, 'rename', prefix)
+        else:
+            print("无效的操作参数")
+            return None
+            
+    except Exception as e:
+        print(f"处理指令失败: {str(e)}")
+        return None
