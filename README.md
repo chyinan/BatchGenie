@@ -9,8 +9,12 @@ BatchGenie 是一款基于 AI 的用户友好型工具，旨在简化和优化�
 ## 功能特性
 
 - 🖋 **批量重命名：** 快速为多个文件添加前缀。
-- 🔄 **批量格式重命名：** 轻松实现多文件格式之间的重命名。
+- 🔄 **批量格式转换：** 轻松实现多文件格式之间的转换。
 - 🤖 **AI 驱动指令：** 使用自然语言描述文件操作，让 BatchGenie 为您完成工作。
+  - 支持文件重命名、移动、复制、删除
+  - 支持创建文件和目录
+  - 操作前预览受影响的文件
+  - 智能理解自然语言指令
 - 🎵 **音频文件分类：** 自动识别并分类不同采样率的音频文件。
   - 支持常见音频格式（WAV, FLAC, AIF, AIFF, M4A）
   - 支持 DSD 格式（DSF, DFF），自动识别 DSD64/128/256/512
@@ -32,7 +36,12 @@ pip install -r requirements.txt
 
 3. 配置：
    - 复制 `config.example.py` 为 `config.py`
-   - 在 `config.py` 中设置你的 OpenAI API key
+   - 获取 Google Gemini API Key:
+     1. 访问 [Google AI Studio](https://makersuite.google.com/app/apikey)
+     2. 登录 Google 账号
+     3. 点击 "Create API Key"
+     4. 复制生成的 API Key
+   - 在 `config.py` 中设置你的 Gemini API Key
 
 ## 使用方法
 
@@ -52,7 +61,10 @@ python main.py
 
 3. AI 模式
    - 使用自然语言描述你想要执行的操作
-   - 例如："帮我把文件夹里的所有图片重命名为 photo_序号"
+   - 例如：
+     - "帮我把文件夹里的所有图片重命名为 photo_序号"
+     - "在桌面创建一个新的文本文件，内容是 Hello World"
+     - "将下载文件夹中的 PDF 文件移动到文档文件夹"
 
 4. 音频文件分类
    - 自动识别音频文件采样率
@@ -62,8 +74,9 @@ python main.py
 ## 注意事项
 
 - 使用前建议备份重要文件
-- AI 功能需要有效的 OpenAI API key
+- AI 功能需要有效的 Google Gemini API Key
 - 确保有足够的磁盘权限
+- 首次使用时可能需要科学上网
 
 ---
 
@@ -74,14 +87,18 @@ python main.py
 BatchGenie is an AI-powered, user-friendly tool designed to streamline and simplify batch file operations. Whether you're renaming files, converting formats, or executing custom commands, BatchGenie enables you to interact with your files effortlessly using natural language instructions. Perfect for both tech-savvy users and beginners alike!
 
 ## Key Features:
-- 🖋 **Batch Rename:** Quickly add prefixes.
-- 🔄 **Batch Format Rename:** Convert multiple files between different formats with ease.
+- 🖋 **Batch Rename:** Quickly add prefixes to multiple files.
+- 🔄 **Batch Format Conversion:** Easily convert multiple files between different formats.
 - 🤖 **AI-Powered Commands:** Use natural language to describe file operations and let BatchGenie do the rest.
+  - Supports file renaming, moving, copying, deleting
+  - Supports creating files and directories
+  - Preview affected files before operations
+  - Smart understanding of natural language instructions
 - 🎵 **Audio File Classification:** Automatically identify and classify audio files by sample rate.
   - Supports common audio formats (WAV, FLAC, AIF, AIFF, M4A)
   - Supports DSD formats (DSF, DFF) with automatic DSD64/128/256/512 detection
   - Creates sample rate subfolders and organizes files automatically
-- 🛠 **Customizable:** Easily extend functionality with modular and scalable Python code.
+- 🛠 **Modular Design:** Built on Python, easily extendable and customizable.
 
 ## Installation
 
@@ -98,7 +115,12 @@ pip install -r requirements.txt
 
 3. Configuration:
    - Copy `config.example.py` to `config.py`
-   - Set your OpenAI API key in `config.py`
+   - Obtain your Google Gemini API Key:
+     1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+     2. Log in to your Google account
+     3. Click "Create API Key"
+     4. Copy the generated API Key
+   - Set your Gemini API Key in `config.py`
 
 ## Usage
 
@@ -109,7 +131,7 @@ python main.py
 
 ### Options:
 1. Batch Rename
-   - Add prefix to files
+   - Add a specified prefix to files
    - Example: `test.txt` -> `PREFIX_test.txt`
 
 2. Format Conversion
@@ -117,8 +139,11 @@ python main.py
    - Example: `.mp4` -> `.m4a`
 
 3. AI Mode
-   - Describe your operation in natural language
-   - Example: "Help me rename all images in the folder to photo_number"
+   - Describe the operation you want to perform in natural language
+   - Example:
+     - "Help me rename all images in the folder to photo_number"
+     - "Create a new text file on the desktop with the content Hello World"
+     - "Move PDF files from the Downloads folder to the Documents folder"
 
 4. Audio Classification
    - Automatically detect audio file sample rates
@@ -127,9 +152,10 @@ python main.py
 
 ## Notes
 
-- Backup important files before use
-- AI features require a valid OpenAI API key
+- It's recommended to back up important files before use
+- AI features require a valid Google Gemini API Key
 - Ensure sufficient disk permissions
+- You may need to use a VPN for the first time
 
 ## Requirements
 
