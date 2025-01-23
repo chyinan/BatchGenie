@@ -35,13 +35,13 @@ pip install -r requirements.txt
 ```
 
 3. 配置：
-   - 复制 `config.example.py` 为 `config.py`
+   - 重命名 `config.example.py` 为 `config.py`
    - 获取 Google Gemini API Key:
      1. 访问 [Google AI Studio](https://makersuite.google.com/app/apikey)
      2. 登录 Google 账号
      3. 点击 "Create API Key"
      4. 复制生成的 API Key
-   - 在 `config.py` 中设置你的 Gemini API Key
+   - 在 `config.py` 中设置你的 Gemini API Key和代理地址
 
 ## 使用方法
 
