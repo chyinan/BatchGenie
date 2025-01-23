@@ -1,18 +1,20 @@
 # ai_controller.py
-import openai
 import os
 import json
 import time
+import shutil
+from pathlib import Path
 from tenacity import retry, stop_after_attempt, wait_exponential
+import google.generativeai as genai
 from modules.renamer import batch_rename
 from modules.converter import batch_convert
-from config import OPENAI_API_KEY
+from config import GEMINI_API_KEY
 
-# 设置代理（如果需要）
-os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7897'  # 根据你的代理设置修改
+# 配置 Gemini
+genai.configure(api_key=GEMINI_API_KEY)
 
-# 创建 OpenAI 客户端
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# 获取模型
+model = genai.GenerativeModel('gemini-pro')
 
 MESSAGES = {
     'zh': {
@@ -22,20 +24,16 @@ MESSAGES = {
         'check_network': "1. 网络连接是否正常",
         'check_proxy': "2. 是否使用了代理服务器",
         'check_api_key': "3. API key 是否正确",
-        'api_timeout': "API 请求超时，正在重试...",
         'network_error': "网络连接错误，正在重试...",
         'ai_result': "AI 解析结果：",
-        'folder_not_exist': "错误：文件夹 '{}' 不存在",
-        'unsupported_operation': "暂不支持的操作：{}",
-        'parse_failed': "AI 响应格式解析失败，尝试使用备用方案...",
-        'path_not_recognized': "未能识别文件夹路径",
-        'command_not_understood': "无法理解的命令",
-        'offline_mode': "正在使用离线模式处理命令...",
-        'enter_path': "请输入有效的文件夹路径",
-        'enter_prefix': "请输入新文件名前缀: ",
-        'enter_format': "请输入目标格式 (例如: .txt): ",
-        'quota_exceeded': "AI 服务配额已用完，切换到离线模式",
-        'processing_error': "AI 处理过程出错：{}"
+        'affected_files': "\n受影响的文件：",
+        'no_files_affected': "没有文件会受到影响",
+        'confirm_execute': "\n是否执行以上操作？(y/n): ",
+        'operation_cancelled': "操作已取消",
+        'operation_completed': "操作已完成",
+        'operation_failed': "操作失败: {}",
+        'invalid_operation': "无效的操作类型: {}",
+        'processing_error': "处理过程出错：{}"
     },
     'en': {
         'connecting': "Connecting to AI service...",
@@ -44,49 +42,122 @@ MESSAGES = {
         'check_network': "1. Network connection",
         'check_proxy': "2. Proxy server settings",
         'check_api_key': "3. API key validity",
-        'api_timeout': "API request timed out, retrying...",
         'network_error': "Network connection error, retrying...",
-        'ai_result': "AI parsing result:",
-        'folder_not_exist': "Error: Folder '{}' does not exist",
-        'unsupported_operation': "Unsupported operation: {}",
-        'parse_failed': "AI response parsing failed, switching to fallback mode...",
-        'path_not_recognized': "Could not recognize folder path",
-        'command_not_understood': "Command not understood",
-        'offline_mode': "Processing command in offline mode...",
-        'enter_path': "Please enter a valid folder path",
-        'enter_prefix': "Enter new filename prefix: ",
-        'enter_format': "Enter target format (e.g., .txt): ",
-        'quota_exceeded': "AI service quota exceeded, switching to offline mode",
-        'processing_error': "Error during AI processing: {}"
+        'ai_result': "AI analysis result:",
+        'affected_files': "\nAffected files:",
+        'no_files_affected': "No files will be affected",
+        'confirm_execute': "\nDo you want to proceed with these operations? (y/n): ",
+        'operation_cancelled': "Operation cancelled",
+        'operation_completed': "Operation completed",
+        'operation_failed': "Operation failed: {}",
+        'invalid_operation': "Invalid operation type: {}",
+        'processing_error': "Processing error: {}"
     }
 }
 
-def extract_folder_path(command):
-    """从 AI 响应中提取文件夹路径"""
-    import re
-    # 尝试匹配引号中或空格后的路径
-    path_match = re.search(r'["\']([^"\']+)["\']|(?:文件夹|目录|路径|folder|directory|path)\s*[：:]\s*(\S+)', command)
-    if path_match:
-        return path_match.group(1) or path_match.group(2)
-    return None
+class FileOperation:
+    def __init__(self, operation_type, source_path, target_path=None, parameters=None):
+        self.type = operation_type  # rename, move, delete, copy, create_dir, create_file 等
+        self.source_path = Path(source_path)
+        self.target_path = Path(target_path) if target_path else None
+        self.parameters = parameters or {}
+
+    def preview(self):
+        """返回此操作将影响的文件列表"""
+        affected_files = []
+        try:
+            if self.type == "rename":
+                affected_files.append(f"{self.source_path} -> {self.target_path}")
+            elif self.type == "move":
+                affected_files.append(f"移动: {self.source_path} -> {self.target_path}")
+            elif self.type == "copy":
+                affected_files.append(f"复制: {self.source_path} -> {self.target_path}")
+            elif self.type == "delete":
+                affected_files.append(f"删除: {self.source_path}")
+            elif self.type == "create_dir":
+                affected_files.append(f"创建目录: {self.source_path}")
+            elif self.type == "create_file":
+                affected_files.append(f"创建文件: {self.source_path}")
+                if self.parameters.get('content'):
+                    affected_files.append(f"文件内容: {self.parameters['content'][:100]}...")
+        except Exception as e:
+            affected_files.append(f"预览错误: {str(e)}")
+        return affected_files
+
+    def execute(self):
+        """执行文件操作"""
+        try:
+            if self.type == "rename":
+                self.source_path.rename(self.target_path)
+            elif self.type == "move":
+                shutil.move(str(self.source_path), str(self.target_path))
+            elif self.type == "copy":
+                shutil.copy2(str(self.source_path), str(self.target_path))
+            elif self.type == "delete":
+                if self.source_path.is_file():
+                    self.source_path.unlink()
+                else:
+                    shutil.rmtree(str(self.source_path))
+            elif self.type == "create_dir":
+                self.source_path.mkdir(parents=True, exist_ok=True)
+            elif self.type == "create_file":
+                # 确保父目录存在
+                self.source_path.parent.mkdir(parents=True, exist_ok=True)
+                # 创建文件并写入内容
+                mode = 'w' if isinstance(self.parameters.get('content', ''), str) else 'wb'
+                with open(self.source_path, mode, encoding='utf-8' if mode == 'w' else None) as f:
+                    if self.parameters.get('content'):
+                        f.write(self.parameters['content'])
+                    else:
+                        f.write('')  # 创建空文件
+            return True
+        except Exception as e:
+            print(f"执行错误: {str(e)}")
+            return False
 
 @retry(
-    stop=stop_after_attempt(3),  # 最多重试3次
-    wait=wait_exponential(multiplier=1, min=4, max=10),  # 指数退避重试
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
     reraise=True
 )
-def get_ai_response(messages, lang='zh'):
+def get_ai_response(prompt, lang='zh'):
     """获取 AI 响应，带重试机制"""
     try:
-        return client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            timeout=30  # 设置30秒超时
-        )
-    except openai.APITimeoutError:
-        print(MESSAGES[lang]['api_timeout'])
-        raise
-    except openai.APIConnectionError:
+        system_prompt = f"""你是一个文件管理助手。请分析用户的需求并返回结构化的 JSON 响应。
+需要返回具体的文件操作步骤，每个步骤包含操作类型和相关参数。请确保返回的 JSON 格式完整且正确。
+
+支持的操作类型：
+- rename: 重命名文件（需要 source_path 和 target_path）
+- move: 移动文件（需要 source_path 和 target_path）
+- copy: 复制文件（需要 source_path 和 target_path）
+- delete: 删除文件（需要 source_path）
+- create_dir: 创建目录（需要 source_path）
+- create_file: 创建文件（需要 source_path 和可选的 content 参数）
+
+响应格式示例：
+{{
+    "description": "操作说明",
+    "operations": [
+        {{
+            "type": "create_file",
+            "source_path": "完整的文件路径，如 C:/Users/username/Desktop/test.txt",
+            "parameters": {{
+                "content": "文件内容"
+            }}
+        }}
+    ]
+}}
+
+注意：
+1. 所有路径必须是完整的绝对路径
+2. Windows 系统中路径分隔符可以用 / 或 \\
+3. 创建文件时必须指定文件扩展名
+
+用户的请求是: {prompt}"""
+
+        response = model.generate_content(system_prompt)
+        return response.text
+    except Exception as e:
         print(MESSAGES[lang]['network_error'])
         raise
 
@@ -96,102 +167,60 @@ def interpret_and_execute(prompt, lang='zh'):
     try:
         print(msg['connecting'])
         
-        # 检查是否使用离线模式
-        if os.getenv('OFFLINE_MODE') == 'true':
-            return handle_offline_mode(prompt, lang)
-            
+        # 获取 AI 响应
+        response = get_ai_response(prompt, lang)
+        
         try:
-            # 系统提示设置更详细的指令
-            system_prompt = """你是一个文件管理助手。请分析用户的需求并返回结构化的 JSON 响应。
-响应格式示例：
-{
-    "action": "rename|convert",
-    "folder_path": "具体路径",
-    "parameters": {
-        "prefix": "新文件名前缀",
-        "from_format": "原格式",
-        "to_format": "目标格式"
-    }
-}"""
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ]
-
-            response = get_ai_response(messages, lang)
+            # 解析 AI 响应
+            result = json.loads(response)
+            print(f"{msg['ai_result']}\n{result['description']}")
             
-            try:
-                # 新版 API 响应格式变更
-                ai_command = json.loads(response.choices[0].message.content)
-                print(f"{msg['ai_result']}\n{json.dumps(ai_command, ensure_ascii=False, indent=2)}")
+            # 创建操作列表
+            operations = []
+            for op in result['operations']:
+                # 确保必要的字段存在
+                if 'type' not in op or 'source_path' not in op:
+                    print(f"无效的操作配置: {op}")
+                    continue
+                    
+                operations.append(FileOperation(
+                    operation_type=op['type'],
+                    source_path=op['source_path'],
+                    target_path=op.get('target_path'),  # 可选字段
+                    parameters=op.get('parameters', {})
+                ))
+            
+            # 预览将要执行的操作
+            print(msg['affected_files'])
+            affected_files = []
+            for op in operations:
+                affected_files.extend(op.preview())
+            
+            if not affected_files:
+                print(msg['no_files_affected'])
+                return
                 
-                folder_path = ai_command.get('folder_path')
-                if not folder_path or not os.path.exists(folder_path):
-                    print(msg['folder_not_exist'].format(folder_path))
+            for file in affected_files:
+                print(f"- {file}")
+            
+            # 请求用户确认
+            if input(msg['confirm_execute']).lower() != 'y':
+                print(msg['operation_cancelled'])
+                return
+            
+            # 执行操作
+            for op in operations:
+                if not op.execute():
+                    print(msg['operation_failed'].format(op.type))
                     return
-                    
-                action = ai_command.get('action', '').lower()
-                params = ai_command.get('parameters', {})
-                
-                if action == 'rename':
-                    prefix = params.get('prefix', 'file')
-                    batch_rename(folder_path, prefix, lang)
-                    
-                elif action == 'convert':
-                    from_format = params.get('from_format', '.txt')
-                    to_format = params.get('to_format', '.txt')
-                    batch_convert(folder_path, lang)
-                    
-                else:
-                    print(msg['unsupported_operation'].format(action))
-                    
-            except json.JSONDecodeError:
-                print(msg['parse_failed'])
-                # 备用方案：简单的关键词匹配
-                ai_command = response.choices[0].message.content
-                folder_path = extract_folder_path(ai_command)
-                
-                if "重命名" in ai_command or "rename" in ai_command.lower():
-                    prefix = "file"  # 可以进一步改进前缀提取
-                    if folder_path:
-                        batch_rename(folder_path, prefix, lang)
-                    else:
-                        print(msg['path_not_recognized'])
-                else:
-                    print(msg['command_not_understood'])
-                
+            
+            print(msg['operation_completed'])
+            
+        except json.JSONDecodeError as e:
+            print(f"AI 响应解析失败: {str(e)}")
+            print(f"原始响应: {response}")
         except Exception as e:
-            if 'insufficient_quota' in str(e):
-                print(msg['quota_exceeded'])
-                return handle_offline_mode(prompt, lang)
-            print(msg['connection_failed'].format(str(e)))
-            print(msg['check_suggestions'])
-            print(msg['check_network'])
-            print(msg['check_proxy'])
-            print(msg['check_api_key'])
-            return
+            print(msg['operation_failed'].format(str(e)))
             
     except Exception as e:
         print(msg['processing_error'].format(str(e)))
-
-def handle_offline_mode(prompt, lang='zh'):
-    """离线模式下的命令处理"""
-    msg = MESSAGES[lang]
-    print(msg['offline_mode'])
-    
-    folder_path = extract_folder_path(prompt)
-    if not folder_path:
-        print(msg['enter_path'])
-        folder_path = input(": ").strip()
-    
-    if "重命名" in prompt or "rename" in prompt.lower():
-        prefix = input(msg['enter_prefix']).strip()
-        if folder_path and prefix:
-            batch_rename(folder_path, prefix, lang)
-    elif any(word in prompt.lower() for word in ["转换", "格式", "convert", "format"]):
-        target_format = input(msg['enter_format']).strip()
-        if folder_path:
-            batch_convert(folder_path, lang)
-    else:
-        print(msg['command_not_understood'])

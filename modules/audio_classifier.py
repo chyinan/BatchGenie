@@ -65,35 +65,57 @@ def classify_audio_by_samplerate(folder_path):
     # 支持的音频文件扩展名
     AUDIO_EXTENSIONS = {'.wav', '.flac', '.aif', '.aiff', '.m4a', '.dsf', '.dff'}
     
-    # 确保文件夹路径存在
-    folder_path = Path(folder_path)
-    if not folder_path.exists():
-        raise FileNotFoundError(f"文件夹 {folder_path} 不存在")
+    while True:
+        try:
+            # 确保文件夹路径存在
+            folder_path = Path(folder_path)
+            if not folder_path.exists():
+                print(f"错误：文件夹 '{folder_path}' 不存在")
+                folder_path = input("请重新输入有效的文件夹路径（或输入 'q' 退出）：")
+                if folder_path.lower() == 'q':
+                    return
+                continue
+            
+            if not folder_path.is_dir():
+                print(f"错误：'{folder_path}' 不是一个文件夹")
+                folder_path = input("请重新输入有效的文件夹路径（或输入 'q' 退出）：")
+                if folder_path.lower() == 'q':
+                    return
+                continue
+            
+            break
+        except Exception as e:
+            print(f"发生错误：{str(e)}")
+            folder_path = input("请重新输入有效的文件夹路径（或输入 'q' 退出）：")
+            if folder_path.lower() == 'q':
+                return
+            continue
     
-    # 用于存储不同采样率的文件
-    samplerate_files = {}
-    
-    # 遍历文件夹中的所有文件
-    for file_path in folder_path.iterdir():
-        if file_path.is_file() and file_path.suffix.lower() in AUDIO_EXTENSIONS:
+    try:
+        # 用于存储不同采样率的文件
+        samplerate_files = {}
+        
+        # 检查文件夹中是否有支持的音频文件
+        audio_files = [f for f in folder_path.iterdir() 
+                      if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS]
+        
+        if not audio_files:
+            print(f"提示：在文件夹 '{folder_path}' 中没有找到支持的音频文件")
+            print(f"支持的格式：{', '.join(AUDIO_EXTENSIONS)}")
+            return
+        
+        # 遍历文件夹中的所有文件
+        for file_path in audio_files:
             try:
-                # 根据文件格式选择不同的读取方法
-                suffix = file_path.suffix.lower()
-                if suffix == '.m4a':
-                    samplerate = get_m4a_samplerate(file_path)
-                    if samplerate is None:
-                        continue
-                    folder_name = f"{samplerate/1000:.1f}kHz".replace(".0", "") if samplerate >= 1000 else f"{samplerate}Hz"
-                elif suffix in {'.dsf', '.dff'}:
-                    folder_name = get_dsd_info(file_path)
-                    if folder_name is None:
-                        continue
+                # 读取音频文件信息
+                info = sf.info(file_path)
+                samplerate = int(info.samplerate)
+                
+                # 将采样率格式化为标准形式
+                if samplerate >= 1000:
+                    folder_name = f"{samplerate/1000:.1f}kHz".replace(".0", "")
                 else:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        info = sf.info(file_path)
-                        samplerate = int(info.samplerate)
-                        folder_name = f"{samplerate/1000:.1f}kHz".replace(".0", "") if samplerate >= 1000 else f"{samplerate}Hz"
+                    folder_name = f"{samplerate}Hz"
                 
                 # 将文件添加到对应采样率的列表中
                 if folder_name not in samplerate_files:
@@ -101,23 +123,33 @@ def classify_audio_by_samplerate(folder_path):
                 samplerate_files[folder_name].append(file_path)
                 
             except Exception as e:
-                print(f"无法读取文件 {file_path.name}: {str(e)}")
-    
-    # 创建子文件夹并移动文件
-    for samplerate, files in samplerate_files.items():
-        # 创建子文件夹
-        subdir = folder_path / samplerate
-        subdir.mkdir(exist_ok=True)
+                print(f"警告：无法读取文件 '{file_path.name}': {str(e)}")
+                continue
         
-        # 移动文件
-        for file_path in files:
-            try:
-                shutil.move(str(file_path), str(subdir / file_path.name))
-                print(f"已移动 {file_path.name} 到 {samplerate} 文件夹")
-            except Exception as e:
-                print(f"移动文件 {file_path.name} 时出错: {str(e)}")
-    
-    # 打印分类统计
-    print("\n分类统计:")
-    for samplerate, files in samplerate_files.items():
-        print(f"{samplerate}: {len(files)} 个文件") 
+        if not samplerate_files:
+            print("没有找到可以处理的音频文件")
+            return
+        
+        # 创建子文件夹并移动文件
+        for samplerate, files in samplerate_files.items():
+            # 创建子文件夹
+            subdir = folder_path / samplerate
+            subdir.mkdir(exist_ok=True)
+            
+            # 移动文件
+            for file_path in files:
+                try:
+                    shutil.move(str(file_path), str(subdir / file_path.name))
+                    print(f"已移动 '{file_path.name}' 到 {samplerate} 文件夹")
+                except Exception as e:
+                    print(f"警告：移动文件 '{file_path.name}' 时出错: {str(e)}")
+        
+        # 打印分类统计
+        print("\n分类统计:")
+        for samplerate, files in samplerate_files.items():
+            print(f"{samplerate}: {len(files)} 个文件")
+            
+    except Exception as e:
+        print(f"处理过程中发生错误：{str(e)}")
+        print("操作已取消")
+        return 

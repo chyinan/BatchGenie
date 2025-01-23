@@ -1,4 +1,10 @@
+import os
 import sys
+import logging
+# 在程序开始时添加这些代码来禁用 absl 的警告
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 禁用 TensorFlow 日志
+logging.getLogger('absl').setLevel(logging.ERROR)  # 设置 absl 日志级别
+
 from modules.ai_controller import interpret_and_execute
 from modules.renamer import batch_rename
 from modules.converter import batch_convert
@@ -13,7 +19,7 @@ MESSAGES = {
         'menu_title': '请选择操作：',
         'menu_rename': '1. 批量重命名',
         'menu_convert': '2. 批量格式重命名',
-        'menu_ai': '3. 使用 AI 模型解析自然语言命令',
+        'menu_ai': '3. 使用 AI 模型解析自然语言命令操作文件',
         'menu_audio': '4. 按采样率分类音频文件',
         'menu_exit': '5. 退出',
         'input_choice': '输入选项编号：',
@@ -57,34 +63,39 @@ def main():
     lang = select_language()
     msg = MESSAGES[lang]
     
-    while True:
-        print(msg['welcome'])
-        print(msg['menu_title'])
-        print(msg['menu_rename'])
-        print(msg['menu_convert'])
-        print(msg['menu_ai'])
-        print(msg['menu_audio'])
-        print(msg['menu_exit'])
+    try:
+        while True:
+            print(msg['welcome'])
+            print(msg['menu_title'])
+            print(msg['menu_rename'])
+            print(msg['menu_convert'])
+            print(msg['menu_ai'])
+            print(msg['menu_audio'])
+            print(msg['menu_exit'])
 
-        choice = input(msg['input_choice'])
-        if choice == "1":
-            folder = input(msg['input_folder'])
-            prefix = input(msg['input_prefix'])
-            batch_rename(folder, prefix)
-        elif choice == "2":
-            folder = input(msg['input_folder'])
-            batch_convert(folder)
-        elif choice == "3":
-            prompt = input(msg['input_command'])
-            interpret_and_execute(prompt, lang)
-        elif choice == "4":
-            folder = input(msg['input_folder'])
-            classify_audio_by_samplerate(folder)
-        elif choice == "5":
-            print(msg['goodbye'])
-            sys.exit(0)
-        else:
-            print(msg['invalid_option'])
+            choice = input(msg['input_choice'])
+            if choice == "1":
+                folder = input(msg['input_folder'])
+                prefix = input(msg['input_prefix'])
+                batch_rename(folder, prefix)
+            elif choice == "2":
+                folder = input(msg['input_folder'])
+                batch_convert(folder)
+            elif choice == "3":
+                prompt = input(msg['input_command'])
+                interpret_and_execute(prompt, lang)
+            elif choice == "4":
+                folder = input(msg['input_folder'])
+                classify_audio_by_samplerate(folder)
+            elif choice == "5":
+                print(msg['goodbye'])
+                # 干净地退出程序
+                os._exit(0)  # 使用 os._exit() 替代 sys.exit()
+            else:
+                print(msg['invalid_option'])
+    except KeyboardInterrupt:
+        print(msg['goodbye'])
+        os._exit(0)
 
 if __name__ == "__main__":
     main()
