@@ -1,6 +1,21 @@
 import os
 
-def batch_rename(folder_path, prefix):
+MESSAGES = {
+    'zh': {
+        'folder_not_exist': "错误：文件夹 '{}' 不存在",
+        'renamed': "已重命名: {} -> {}",
+        'rename_complete': "批量重命名完成！",
+        'error': "重命名过程中出错：{}"
+    },
+    'en': {
+        'folder_not_exist': "Error: Folder '{}' does not exist",
+        'renamed': "Renamed: {} -> {}",
+        'rename_complete': "Batch rename completed!",
+        'error': "Error during renaming: {}"
+    }
+}
+
+def batch_rename(folder_path, prefix, lang='zh'):
     """
     批量重命名指定文件夹中的文件
     
@@ -8,9 +23,10 @@ def batch_rename(folder_path, prefix):
         folder_path (str): 文件夹路径
         prefix (str): 新文件名前缀
     """
+    msg = MESSAGES[lang]
     try:
         if not os.path.exists(folder_path):
-            print(f"错误：文件夹 '{folder_path}' 不存在")
+            print(msg['folder_not_exist'].format(folder_path))
             return
             
         files = os.listdir(folder_path)
@@ -21,8 +37,8 @@ def batch_rename(folder_path, prefix):
                 new_filename = f"{prefix}{filename}"
                 new_path = os.path.join(folder_path, new_filename)
                 os.rename(old_path, new_path)
-                print(f"已重命名: {filename} -> {new_filename}")
+                print(msg['renamed'].format(filename, new_filename))
         
-        print("批量重命名完成！")
+        print(msg['rename_complete'])
     except Exception as e:
-        print(f"重命名过程中出错：{str(e)}")
+        print(msg['error'].format(str(e)))
