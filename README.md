@@ -20,6 +20,9 @@ BatchGenie 是一款基于 AI 的用户友好型工具，旨在简化和优化�
   - 支持 DSD 格式（DSF, DFF），自动识别 DSD64/128/256/512
   - 自动创建采样率子文件夹并分类整理
 - 🛠 **模块化设计：** 基于 Python，功能可轻松扩展和定制。
+- 🌏 **多语言支持：** 支持中文和英文两种语言。
+  - 可扩展的语言支持系统。
+- 📂 **智能文件夹监控：** 支持实时监控多个源文件夹中文件的变动并批量执行各种文件操作。
 
 ## 安装说明
 
@@ -99,6 +102,10 @@ BatchGenie is an AI-powered, user-friendly tool designed to streamline and simpl
   - Supports DSD formats (DSF, DFF) with automatic DSD64/128/256/512 detection
   - Creates sample rate subfolders and organizes files automatically
 - 🛠 **Modular Design:** Built on Python, easily extendable and customizable.
+- 🌏 **Multi-language Support:** Supports both Chinese and English.
+  - Extensible language support system.
+- 📂 **Smart Folder Monitoring:** Supports real-time monitoring of file changes in multiple source folders and batch execution of various file operations.
+
 
 ## Installation
 
@@ -121,7 +128,7 @@ pip install -r requirements.txt
      3. Click "Create API Key"
      4. Copy the generated API Key
    - Set your Gemini API Key in `config.py`
-
+   - If you need to add a proxy, please set it in the PROXY column
 ## Usage
 
 Run the program:
