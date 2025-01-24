@@ -6,6 +6,31 @@ from mutagen.mp4 import MP4
 from mutagen.dsf import DSF
 import warnings
 
+MESSAGES = {
+    'zh': {
+        'moved': "已移动 '{}' 到 {} 文件夹",
+        'stats_header': "\n分类统计:",
+        'stats_format': "{}: {} 个文件",
+        'error_reading': "读取文件 '{}' 时出错: {}",
+        'error_creating_dir': "创建目录 '{}' 时出错: {}",
+        'error_moving': "移动文件 '{}' 时出错: {}",
+        'no_audio_files': "指定目录中没有找到音频文件",
+        'processing': "正在处理音频文件...",
+        'complete': "音频文件分类完成！"
+    },
+    'en': {
+        'moved': "Moved '{}' to {} folder",
+        'stats_header': "\nClassification Statistics:",
+        'stats_format': "{}: {} files",
+        'error_reading': "Error reading file '{}': {}",
+        'error_creating_dir': "Error creating directory '{}': {}",
+        'error_moving': "Error moving file '{}': {}",
+        'no_audio_files': "No audio files found in the specified directory",
+        'processing': "Processing audio files...",
+        'complete': "Audio file classification completed!"
+    }
+}
+
 def get_m4a_samplerate(file_path):
     """
     获取 m4a 文件的采样率
@@ -54,6 +79,69 @@ def get_dsd_info(file_path):
     except Exception as e:
         print(f"无法读取 DSD 文件 {file_path.name}: {str(e)}")
         return None
+
+def classify_audio_files(folder_path, lang='zh'):
+    """根据采样率对音频文件进行分类
+    
+    Args:
+        folder_path (str): 音频文件所在文件夹路径
+        lang (str): 语言选项 ('zh' 或 'en')
+    """
+    try:
+        msg = MESSAGES[lang]
+        print(msg['processing'])
+        
+        # 统计不同采样率的文件数量
+        sample_rate_count = {}
+        
+        # 遍历文件夹中的所有文件
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            
+            # 跳过文件夹
+            if os.path.isdir(file_path):
+                continue
+                
+            try:
+                # 读取音频文件信息
+                with sf.SoundFile(file_path) as audio_file:
+                    sample_rate = audio_file.samplerate
+                    
+                    # 创建对应采样率的文件夹
+                    rate_folder = f"{sample_rate/1000:.1f}kHz"
+                    rate_path = os.path.join(folder_path, rate_folder)
+                    
+                    try:
+                        os.makedirs(rate_path, exist_ok=True)
+                    except Exception as e:
+                        print(msg['error_creating_dir'].format(rate_folder, str(e)))
+                        continue
+                    
+                    # 移动文件
+                    try:
+                        shutil.move(file_path, os.path.join(rate_path, filename))
+                        print(msg['moved'].format(filename, rate_folder))
+                        
+                        # 更新统计
+                        sample_rate_count[rate_folder] = sample_rate_count.get(rate_folder, 0) + 1
+                        
+                    except Exception as e:
+                        print(msg['error_moving'].format(filename, str(e)))
+                        
+            except Exception as e:
+                print(msg['error_reading'].format(filename, str(e)))
+                
+        # 显示统计信息
+        if sample_rate_count:
+            print(msg['stats_header'])
+            for rate, count in sample_rate_count.items():
+                print(msg['stats_format'].format(rate, count))
+            print(msg['complete'])
+        else:
+            print(msg['no_audio_files'])
+            
+    except Exception as e:
+        print(f"Error: {str(e)}")
 
 def classify_audio_by_samplerate(folder_path):
     """

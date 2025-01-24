@@ -8,7 +8,7 @@ logging.getLogger('absl').setLevel(logging.ERROR)  # 设置 absl 日志级别
 from modules.ai_controller import interpret_and_execute
 from modules.renamer import batch_rename
 from modules.converter import batch_convert
-from modules.audio_classifier import classify_audio_by_samplerate
+from modules.audio_classifier import classify_audio_files
 
 # 语言配置
 MESSAGES = {
@@ -48,6 +48,41 @@ MESSAGES = {
     }
 }
 
+MENU_MESSAGES = {
+    'zh': {
+        'welcome': "欢迎使用 BatchGenie！",
+        'select_operation': "请选择操作：",
+        'options': [
+            "批量重命名",
+            "批量格式重命名",
+            "使用 AI 模型处理自然语言命令",
+            "按采样率分类音频文件",
+            "退出"
+        ],
+        'enter_option': "请输入选项编号：",
+        'enter_folder': "请输入文件夹路径：",
+        'enter_command': "请输入您的自然语言命令：",
+        'invalid_option': "无效的选项，请重试",
+        'press_enter': "\n按回车键继续..."
+    },
+    'en': {
+        'welcome': "Welcome to BatchGenie!",
+        'select_operation': "Please select an operation:",
+        'options': [
+            "Batch Rename",
+            "Batch Format Rename",
+            "Use AI Model to Process Natural Language Commands",
+            "Classify Audio Files by Sample Rate",
+            "Exit"
+        ],
+        'enter_option': "Enter option number:",
+        'enter_folder': "Enter folder path:",
+        'enter_command': "Enter your Natural Language command:",
+        'invalid_option': "Invalid option, please try again",
+        'press_enter': "\nPress Enter to continue..."
+    }
+}
+
 def select_language():
     while True:
         print(MESSAGES['zh']['select_language'])
@@ -58,44 +93,32 @@ def select_language():
         elif choice == '2':
             return 'en'
 
-def main():
-    # 选择语言
-    lang = select_language()
-    msg = MESSAGES[lang]
-    
-    try:
-        while True:
-            print(msg['welcome'])
-            print(msg['menu_title'])
-            print(msg['menu_rename'])
-            print(msg['menu_convert'])
-            print(msg['menu_ai'])
-            print(msg['menu_audio'])
-            print(msg['menu_exit'])
-
-            choice = input(msg['input_choice'])
-            if choice == "1":
-                folder = input(msg['input_folder'])
-                prefix = input(msg['input_prefix'])
-                batch_rename(folder, prefix)
-            elif choice == "2":
-                folder = input(msg['input_folder'])
-                batch_convert(folder)
-            elif choice == "3":
-                prompt = input(msg['input_command'])
-                interpret_and_execute(prompt, lang)
-            elif choice == "4":
-                folder = input(msg['input_folder'])
-                classify_audio_by_samplerate(folder)
-            elif choice == "5":
-                print(msg['goodbye'])
-                # 干净地退出程序
-                os._exit(0)  # 使用 os._exit() 替代 sys.exit()
-            else:
-                print(msg['invalid_option'])
-    except KeyboardInterrupt:
-        print(msg['goodbye'])
-        os._exit(0)
+def main(lang='zh'):
+    msg = MENU_MESSAGES[lang]
+    while True:
+        print(f"\n{msg['welcome']}")
+        print(f"{msg['select_operation']}")
+        for i, option in enumerate(msg['options'], 1):
+            print(f"{i}. {option}")
+            
+        try:
+            choice = int(input(f"{msg['enter_option']} "))
+            
+            if choice == 3:  # AI 命令处理
+                command = input(f"{msg['enter_command']} ")
+                interpret_and_execute(command, lang)
+                input(msg['press_enter'])  # 等待用户按回车继续
+            elif choice == 4:  # 音频分类
+                folder_path = input(f"{msg['enter_folder']} ")
+                classify_audio_files(folder_path, lang)
+                input(msg['press_enter'])  # 等待用户按回车继续
+            elif choice == 5:  # 退出
+                break
+            # ... 其他选项的处理 ...
+            
+        except ValueError:
+            print(msg['invalid_option'])
+            input(msg['press_enter'])  # 等待用户按回车继续
 
 if __name__ == "__main__":
     main()

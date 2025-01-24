@@ -11,7 +11,7 @@ from modules.converter import batch_convert
 from config import GEMINI_API_KEY
 import glob  # 添加这个导入
 from .prefix_handler import add_prefix
-from .mover import batch_move
+from .file_transfer import batch_move, batch_copy  # 更新导入
 
 # 配置 Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -35,15 +35,15 @@ MESSAGES = {
         'check_proxy': "2. 是否使用了代理服务器",
         'check_api_key': "3. API key 是否正确",
         'network_error': "网络连接错误，正在重试...",
-        'ai_result': "AI 解析结果：",
-        'affected_files': "\n受影响的文件：",
+        'ai_result': "AI 分析结果：",
+        'affected_files': "受影响的文件：",
         'no_files_affected': "没有文件会受到影响",
-        'confirm_execute': "\n是否执行以上操作？(y/n): ",
+        'confirm_execute': "是否执行以上操作？(y/n): ",
         'operation_cancelled': "操作已取消",
-        'operation_completed': "操作已完成",
-        'operation_failed': "操作失败: {}",
+        'operation_completed': "操作完成",
+        'operation_failed': "操作失败：{}",
         'invalid_operation': "无效的操作类型: {}",
-        'processing_error': "处理过程出错：{}"
+        'processing_error': "处理出错：{}"
     },
     'en': {
         'connecting': "Connecting to AI service...",
@@ -53,10 +53,10 @@ MESSAGES = {
         'check_proxy': "2. Proxy server settings",
         'check_api_key': "3. API key validity",
         'network_error': "Network connection error, retrying...",
-        'ai_result': "AI analysis result:",
-        'affected_files': "\nAffected files:",
+        'ai_result': "AI Analysis Result:",
+        'affected_files': "Affected files:",
         'no_files_affected': "No files will be affected",
-        'confirm_execute': "\nDo you want to proceed with these operations? (y/n): ",
+        'confirm_execute': "Do you want to proceed with these operations? (y/n): ",
         'operation_cancelled': "Operation cancelled",
         'operation_completed': "Operation completed",
         'operation_failed': "Operation failed: {}",
@@ -159,8 +159,7 @@ def get_ai_response(prompt, lang='zh'):
             "files": [
                 "C:/path/to/*.txt"
             ],
-            "prefix": "PREFIX_",
-            "description": "为指定文件添加前缀"
+            "prefix": "PREFIX_"
         }}
 
         2. 移动文件：
@@ -169,8 +168,16 @@ def get_ai_response(prompt, lang='zh'):
             "files": [
                 "C:/source/path/*.txt"
             ],
-            "target_dir": "C:/target/path",
-            "description": "将文件移动到指定目录"
+            "target_dir": "C:/target/path"
+        }}
+
+        3. 复制文件：
+        {{
+            "operation": "copy",
+            "files": [
+                "C:/source/path/*.txt"
+            ],
+            "target_dir": "C:/target/path"
         }}
 
         注意：
@@ -251,6 +258,10 @@ def interpret_and_execute(prompt, lang='zh'):
                 for file_path in files:
                     target_path = os.path.join(target_dir, os.path.basename(file_path))
                     affected_files.append(f"- {file_path} -> {target_path}")
+            elif operation == 'copy' and files and target_dir:
+                for file_path in files:
+                    target_path = os.path.join(target_dir, os.path.basename(file_path))
+                    affected_files.append(f"- {file_path} -> {target_path}")
             
             if not affected_files:
                 print(msg['no_files_affected'])
@@ -270,7 +281,11 @@ def interpret_and_execute(prompt, lang='zh'):
                     print(msg['operation_failed'].format(operation))
                     return
             elif operation == 'move':
-                if not batch_move(files, target_dir):
+                if not batch_move(files, target_dir, lang):
+                    print(msg['operation_failed'].format(operation))
+                    return
+            elif operation == 'copy':
+                if not batch_copy(files, target_dir, lang):
                     print(msg['operation_failed'].format(operation))
                     return
             
