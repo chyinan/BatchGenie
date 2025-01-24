@@ -9,9 +9,10 @@ import google.generativeai as genai
 from modules.renamer import batch_rename
 from modules.converter import batch_convert
 from config import GEMINI_API_KEY
-import glob  # 添加这个导入
+import glob
 from .prefix_handler import add_prefix
-from .file_transfer import batch_move, batch_copy  # 更新导入
+from .file_transfer import batch_move, batch_copy
+from .file_monitor import SmartFolderMonitor  # 只导入新的监控类
 
 # 配置 Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -43,7 +44,15 @@ MESSAGES = {
         'operation_completed': "操作完成",
         'operation_failed': "操作失败：{}",
         'invalid_operation': "无效的操作类型: {}",
-        'processing_error': "处理出错：{}"
+        'processing_error': "处理出错：{}",
+        'invalid_params': "无效的监控参数",
+        'monitor_settings': "\n监控设置：",
+        'source_roots': "源文件夹列表:\n{}",
+        'target_root': "目标文件夹: {}",
+        'file_types': "文件类型: {}",
+        'monitoring_active': "所有监控器已启动，按 Ctrl+C 停止...",
+        'monitoring_stopped': "所有监控器已停止",
+        'paths_not_exist': "以下路径不存在：\n{}\n请检查路径是否正确。"
     },
     'en': {
         'connecting': "Connecting to AI service...",
@@ -61,7 +70,15 @@ MESSAGES = {
         'operation_completed': "Operation completed",
         'operation_failed': "Operation failed: {}",
         'invalid_operation': "Invalid operation type: {}",
-        'processing_error': "Processing error: {}"
+        'processing_error': "Processing error: {}",
+        'invalid_params': "Invalid monitor parameters",
+        'monitor_settings': "\nMonitor Settings:",
+        'source_roots': "Source directories:\n{}",
+        'target_root': "Target directory: {}",
+        'file_types': "File types: {}",
+        'monitoring_active': "All monitors are active, press Ctrl+C to stop...",
+        'monitoring_stopped': "All monitors have been stopped",
+        'paths_not_exist': "The following paths do not exist:\n{}\nPlease check if the paths are correct."
     }
 }
 
@@ -171,22 +188,26 @@ def get_ai_response(prompt, lang='zh'):
             "target_dir": "C:/target/path"
         }}
 
-        3. 复制文件：
+        3. 智能文件夹监控：
         {{
-            "operation": "copy",
-            "files": [
-                "C:/source/path/*.txt"
+            "operation": "smart_monitor",
+            "source_roots": [
+                "D:/DRV VST PROJECT/htdemucs",
+                "D:/DRV VST PROJECT/htdemucs_6s",
+                "D:/DRV VST PROJECT/htdemucs_ft"
             ],
-            "target_dir": "C:/target/path"
+            "target_root": "D:/DRV VST PROJECT/DRV-SA-InstVoc-Custom",
+            "file_types": [".wav"]
         }}
 
         注意：
-        1. 对于批量操作，请使用通配符（如 *.txt）来匹配文件
-        2. 返回的 JSON 中不要包含任何注释
-        3. 确保返回的是标准的 JSON 格式
+        1. 对于批量操作，请使用通配符（如 *.wav）来匹配文件
+        2. 确保返回的是标准的 JSON 格式
+        3. 路径中的反斜杠需要使用正斜杠替代
+        4. 文件类型要包含点号（如 .wav）
+        5. 多个源文件夹路径要放在 source_roots 数组中
 
-        用户的请求是: {prompt}
-        请确保返回的内容是有效的 JSON 格式，不要包含任何 Markdown 代码块标记或注释。"""
+        用户的请求是: {prompt}"""
         
         response = model.generate_content(system_prompt)
         response_text = response.text
@@ -217,6 +238,15 @@ def get_ai_response(prompt, lang='zh'):
         print(f"详细错误信息: {str(e)}")  # 输出详细错误信息
         raise
 
+def _normalize_path(path):
+    """规范化路径字符串，处理空格和斜杠问题"""
+    # 替换所有反斜杠为正斜杠
+    path = path.replace('\\', '/')
+    # 移除多余的正斜杠
+    path = '/'.join(filter(None, path.split('/')))
+    # 转换回系统路径格式
+    return os.path.normpath(path)
+
 def interpret_and_execute(prompt, lang='zh'):
     """解析并执行自然语言命令"""
     msg = MESSAGES[lang]
@@ -232,63 +262,73 @@ def interpret_and_execute(prompt, lang='zh'):
             
             # 获取操作类型和参数
             operation = result.get('operation')
-            file_patterns = result.get('files', [])
-            prefix = result.get('prefix', '')
-            target_dir = result.get('target_dir', '')
             
-            # 展开通配符，获取实际的文件列表
-            files = []
-            for pattern in file_patterns:
-                pattern = pattern.replace('/', os.path.sep)
-                matched_files = glob.glob(pattern)
-                files.extend(matched_files)
-            
-            # 显示将要执行的操作
-            print(msg['affected_files'])
-            affected_files = []
-            
-            if operation == 'add_prefix' and files and prefix:
-                for file_path in files:
-                    new_name = os.path.join(
-                        os.path.dirname(file_path),
-                        f"{prefix}{os.path.basename(file_path)}"
-                    )
-                    affected_files.append(f"- {file_path} -> {new_name}")
-            elif operation == 'move' and files and target_dir:
-                for file_path in files:
-                    target_path = os.path.join(target_dir, os.path.basename(file_path))
-                    affected_files.append(f"- {file_path} -> {target_path}")
-            elif operation == 'copy' and files and target_dir:
-                for file_path in files:
-                    target_path = os.path.join(target_dir, os.path.basename(file_path))
-                    affected_files.append(f"- {file_path} -> {target_path}")
-            
-            if not affected_files:
-                print(msg['no_files_affected'])
-                return
+            if operation == 'smart_monitor':
+                # 获取并规范化监控参数
+                source_roots = [_normalize_path(src) for src in result.get('source_roots', [])]
+                target_root = _normalize_path(result.get('target_root', ''))
+                file_types = result.get('file_types', ['.wav'])
                 
-            for file in affected_files:
-                print(file)
+                if not source_roots or not target_root:
+                    print(msg['invalid_params'])
+                    return
+                
+                # 验证所有路径是否存在
+                invalid_paths = []
+                for src in source_roots:
+                    if not os.path.exists(src):
+                        invalid_paths.append(src)
+                
+                if invalid_paths:
+                    print(msg['paths_not_exist'].format('\n'.join(f"- {p}" for p in invalid_paths)))
+                    return
+                
+                # 显示监控设置
+                print(msg['monitor_settings'])
+                print(msg['source_roots'].format('\n'.join(f"- {src}" for src in source_roots)))
+                print(msg['target_root'].format(target_root))
+                print(msg['file_types'].format(', '.join(file_types)))
+                
+                # 创建多个监控器
+                monitors = []
+                for source_root in source_roots:
+                    monitor = SmartFolderMonitor(
+                        source_root,
+                        target_root,
+                        file_types,
+                        lang
+                    )
+                    monitors.append(monitor)
+                
+                # 启动所有监控器
+                for monitor in monitors:
+                    monitor.start()
+                
+                print(msg['monitoring_active'])
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    for monitor in monitors:
+                        monitor.stop()
+                    print(msg['monitoring_stopped'])
             
-            # 请求用户确认
-            if input(msg['confirm_execute']).lower() != 'y':
-                print(msg['operation_cancelled'])
-                return
-            
-            # 执行操作
-            if operation == 'add_prefix':
-                if not add_prefix(files, prefix):
+            elif operation == 'add_prefix':
+                if not add_prefix(result.get('files', []), result.get('prefix', '')):
                     print(msg['operation_failed'].format(operation))
                     return
             elif operation == 'move':
-                if not batch_move(files, target_dir, lang):
+                if not batch_move(result.get('files', []), result.get('target_dir'), lang):
                     print(msg['operation_failed'].format(operation))
                     return
             elif operation == 'copy':
-                if not batch_copy(files, target_dir, lang):
+                if not batch_copy(result.get('files', []), result.get('target_dir'), lang):
                     print(msg['operation_failed'].format(operation))
                     return
-            
+            else:
+                print(msg['invalid_operation'].format(operation))
+                return
+                
             print(msg['operation_completed'])
             
         except json.JSONDecodeError as e:

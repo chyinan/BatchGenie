@@ -19,9 +19,14 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Virtual Environment
+venv/
+ENV/
 
 # IDE
 .idea/
@@ -32,3 +37,6 @@ var/
 # 操作系统
 .DS_Store
 Thumbs.db
+
+# Project specific
+*.log

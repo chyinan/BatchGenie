@@ -1,5 +1,7 @@
 import os
 import shutil
+import time
+import psutil  # 用于检查文件占用
 
 MESSAGES = {
     'zh': {
@@ -9,7 +11,9 @@ MESSAGES = {
         'copied': "已复制: {} -> {}",
         'move_complete': "批量移动完成！",
         'copy_complete': "批量复制完成！",
-        'error': "操作过程中出错：{}"
+        'error': "操作过程中出错：{}",
+        'file_in_use': "文件正在被其他程序使用：{}",
+        'waiting': "等待文件释放: {}"
     },
     'en': {
         'source_not_exist': "Error: Source file/folder '{}' does not exist",
@@ -18,7 +22,9 @@ MESSAGES = {
         'copied': "Copied: {} -> {}",
         'move_complete': "Batch move completed!",
         'copy_complete': "Batch copy completed!",
-        'error': "Error during operation: {}"
+        'error': "Error during operation: {}",
+        'file_in_use': "File is in use by another program: {}",
+        'waiting': "Waiting for file to be released: {}"
     }
 }
 
@@ -34,28 +40,47 @@ def _get_unique_path(target_path):
         counter += 1
     return target_path
 
-def batch_transfer(files, target_dir, operation='move', lang='zh'):
-    """批量移动或复制文件到指定目录
-    
-    Args:
-        files (list): 要处理的文件路径列表
-        target_dir (str): 目标目录路径
-        operation (str): 操作类型，'move' 或 'copy'
-        lang (str): 语言选项 ('zh' 或 'en')
-        
-    Returns:
-        list: 包含(源路径, 目标路径)元组的列表
-    """
+def is_file_in_use(file_path):
+    """检查文件是否被占用"""
+    try:
+        # 尝试以独占模式打开文件
+        with open(file_path, 'rb') as f:
+            try:
+                # 在 Windows 上尝试获取文件锁
+                msvcrt = __import__('msvcrt')
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            except ImportError:
+                # 在其他系统上使用 fcntl
+                import fcntl
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        return False
+    except (IOError, OSError):
+        return True
+
+def batch_transfer(files, target_dir, operation='move', lang='zh', wait_time=3):
+    """批量移动或复制文件到指定目录"""
     try:
         # 确保目标目录存在
         os.makedirs(target_dir, exist_ok=True)
+        msg = MESSAGES[lang]
         
         results = []
         for file_path in files:
             if not os.path.exists(file_path):
-                print(MESSAGES[lang]['source_not_exist'].format(file_path))
+                print(msg['source_not_exist'].format(file_path))
                 continue
-                
+            
+            # 等待指定时间
+            print(msg['waiting'].format(file_path))
+            time.sleep(wait_time)
+            
+            # 检查文件是否被占用
+            if is_file_in_use(file_path):
+                print(msg['file_in_use'].format(file_path))
+                continue
+            
             # 构建目标文件路径
             filename = os.path.basename(file_path)
             target_path = os.path.join(target_dir, filename)
@@ -66,23 +91,23 @@ def batch_transfer(files, target_dir, operation='move', lang='zh'):
             # 执行操作
             if operation == 'move':
                 shutil.move(file_path, target_path)
-                print(MESSAGES[lang]['moved'].format(file_path, target_path))
+                print(msg['moved'].format(file_path, target_path))
             else:  # copy
-                shutil.copy2(file_path, target_path)  # copy2 保留元数据
-                print(MESSAGES[lang]['copied'].format(file_path, target_path))
+                shutil.copy2(file_path, target_path)
+                print(msg['copied'].format(file_path, target_path))
                 
             results.append((file_path, target_path))
             
         # 显示完成消息
         if operation == 'move':
-            print(MESSAGES[lang]['move_complete'])
+            print(msg['move_complete'])
         else:
-            print(MESSAGES[lang]['copy_complete'])
+            print(msg['copy_complete'])
             
         return results
         
     except Exception as e:
-        print(MESSAGES[lang]['error'].format(str(e)))
+        print(msg['error'].format(str(e)))
         raise
 
 def batch_move(files, target_dir, lang='zh'):

@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import time
 # 在程序开始时添加这些代码来禁用 absl 的警告
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 禁用 TensorFlow 日志
 logging.getLogger('absl').setLevel(logging.ERROR)  # 设置 absl 日志级别
@@ -9,6 +10,7 @@ from modules.ai_controller import interpret_and_execute
 from modules.renamer import batch_rename
 from modules.converter import batch_convert
 from modules.audio_classifier import classify_audio_files
+from modules.file_monitor import SmartFolderMonitor  # 更新为新的监控类
 
 # 语言配置
 MESSAGES = {
@@ -61,7 +63,7 @@ MENU_MESSAGES = {
         ],
         'enter_option': "请输入选项编号：",
         'enter_folder': "请输入文件夹路径：",
-        'enter_command': "请输入您的自然语言命令：",
+        'enter_command': "请输入您的命令：",
         'invalid_option': "无效的选项，请重试",
         'press_enter': "\n按回车键继续..."
     },
@@ -77,7 +79,7 @@ MENU_MESSAGES = {
         ],
         'enter_option': "Enter option number:",
         'enter_folder': "Enter folder path:",
-        'enter_command': "Enter your Natural Language command:",
+        'enter_command': "Enter your command:",
         'invalid_option': "Invalid option, please try again",
         'press_enter': "\nPress Enter to continue..."
     }
@@ -119,6 +121,9 @@ def main(lang='zh'):
         except ValueError:
             print(msg['invalid_option'])
             input(msg['press_enter'])  # 等待用户按回车继续
+        except KeyboardInterrupt:
+            print("\n")
+            break
 
 if __name__ == "__main__":
     main()
