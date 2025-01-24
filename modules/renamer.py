@@ -15,21 +15,19 @@ MESSAGES = {
     }
 }
 
-def batch_rename(files, prefix=''):
-    """批量重命名文件，添加指定前缀"""
+def batch_rename(files, new_names):
+    """批量重命名文件"""
     try:
         results = []
-        for file_path in files:
+        for file_path, new_name in zip(files, new_names):
             if not os.path.exists(file_path):
                 continue
                 
-            # 获取文件目录和文件名
+            # 获取文件目录
             directory = os.path.dirname(file_path)
-            filename = os.path.basename(file_path)
             
-            # 构建新文件名（添加前缀）
-            new_filename = f"{prefix}{filename}"
-            new_filepath = os.path.join(directory, new_filename)
+            # 构建新文件路径
+            new_filepath = os.path.join(directory, new_name)
             
             # 重命名文件
             os.rename(file_path, new_filepath)

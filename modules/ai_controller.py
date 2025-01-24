@@ -10,6 +10,8 @@ from modules.renamer import batch_rename
 from modules.converter import batch_convert
 from config import GEMINI_API_KEY
 import glob  # 添加这个导入
+from .prefix_handler import add_prefix
+from .mover import batch_move
 
 # 配置 Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -150,6 +152,8 @@ def get_ai_response(prompt, lang='zh'):
 
         system_prompt = f"""你是一个文件管理助手。请分析用户的需求并返回结构化的 JSON 响应。
         以下是返回格式的示例：
+
+        1. 添加前缀：
         {{
             "operation": "add_prefix",
             "files": [
@@ -158,12 +162,22 @@ def get_ai_response(prompt, lang='zh'):
             "prefix": "PREFIX_",
             "description": "为指定文件添加前缀"
         }}
-        
+
+        2. 移动文件：
+        {{
+            "operation": "move",
+            "files": [
+                "C:/source/path/*.txt"
+            ],
+            "target_dir": "C:/target/path",
+            "description": "将文件移动到指定目录"
+        }}
+
         注意：
         1. 对于批量操作，请使用通配符（如 *.txt）来匹配文件
         2. 返回的 JSON 中不要包含任何注释
         3. 确保返回的是标准的 JSON 格式
-        
+
         用户的请求是: {prompt}
         请确保返回的内容是有效的 JSON 格式，不要包含任何 Markdown 代码块标记或注释。"""
         
@@ -208,19 +222,17 @@ def interpret_and_execute(prompt, lang='zh'):
         try:
             # 解析 AI 响应
             result = json.loads(response)
-            print(f"{msg['ai_result']}\n{result['description']}")
             
             # 获取操作类型和参数
             operation = result.get('operation')
             file_patterns = result.get('files', [])
             prefix = result.get('prefix', '')
+            target_dir = result.get('target_dir', '')
             
             # 展开通配符，获取实际的文件列表
             files = []
             for pattern in file_patterns:
-                # 将路径分隔符统一为系统风格
                 pattern = pattern.replace('/', os.path.sep)
-                # 展开通配符
                 matched_files = glob.glob(pattern)
                 files.extend(matched_files)
             
@@ -235,6 +247,10 @@ def interpret_and_execute(prompt, lang='zh'):
                         f"{prefix}{os.path.basename(file_path)}"
                     )
                     affected_files.append(f"- {file_path} -> {new_name}")
+            elif operation == 'move' and files and target_dir:
+                for file_path in files:
+                    target_path = os.path.join(target_dir, os.path.basename(file_path))
+                    affected_files.append(f"- {file_path} -> {target_path}")
             
             if not affected_files:
                 print(msg['no_files_affected'])
@@ -250,7 +266,11 @@ def interpret_and_execute(prompt, lang='zh'):
             
             # 执行操作
             if operation == 'add_prefix':
-                if not process_files(files, 'rename', prefix):
+                if not add_prefix(files, prefix):
+                    print(msg['operation_failed'].format(operation))
+                    return
+            elif operation == 'move':
+                if not batch_move(files, target_dir):
                     print(msg['operation_failed'].format(operation))
                     return
             
@@ -302,14 +322,18 @@ def process_command(command, lang='zh'):
         # 获取操作类型和参数
         operation = response_json.get('operation')
         files = response_json.get('files', [])
-        prefix = response_json.get('prefix', '')
         
-        # 检查操作类型
-        if operation == 'add_prefix' and files and prefix:
-            return process_files(files, 'rename', prefix)
-        else:
-            print("无效的操作参数")
-            return None
+        if operation == 'add_prefix':
+            prefix = response_json.get('prefix', '')
+            if files and prefix:
+                return add_prefix(files, prefix)
+        elif operation == 'rename':
+            new_names = response_json.get('new_names', [])
+            if files and new_names and len(files) == len(new_names):
+                return batch_rename(files, new_names)
+        
+        print("无效的操作参数")
+        return None
             
     except Exception as e:
         print(f"处理指令失败: {str(e)}")
