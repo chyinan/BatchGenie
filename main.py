@@ -11,6 +11,8 @@ from modules.prefix_handler import add_prefix
 from modules.converter import batch_convert
 from modules.audio_classifier import classify_audio_files
 from modules.file_monitor import SmartFolderMonitor
+from modules.suffix_handler import add_suffix  # 更新导入
+
 
 MESSAGES = {
     'zh': {
@@ -19,15 +21,19 @@ MESSAGES = {
         'welcome': '\n欢迎使用 BatchGenie!',
         'menu_title': '请选择操作：',
         'menu_prefix': '1. 批量添加前缀',
-        'menu_convert': '2. 批量格式转换',
-        'menu_ai': '3. 使用 AI 模型解析自然语言命令',
-        'menu_audio': '4. 按采样率分类音频文件',
-        'menu_monitor': '5. 文件夹监控',
-        'menu_exit': '6. 退出',
+        'menu_suffix': '2. 批量添加后缀',
+        'menu_convert': '3. 批量格式转换',
+        'menu_ai': '4. 使用 AI 模型解析自然语言命令',
+        'menu_audio': '5. 按采样率分类音频文件',
+        'menu_monitor': '6. 文件夹监控',
+        'menu_exit': '7. 退出',
         'input_choice': '输入选项编号：',
         'input_folder': '请输入文件夹路径：',
         'input_files': '请输入文件路径（支持通配符，多个路径用英文逗号分隔）：',
         'input_prefix': '请输入要添加的前缀：',
+        'input_suffix_folder': '请输入需要批量添加后缀的文件夹：',  # 更新提示
+        'input_suffix_pattern': '请输入需要批量添加后缀的文件扩展名（如 txt）：',  # 更新提示
+        'input_suffix': '请输入要添加的后缀：',  # 确保提示正确
         'input_command': '请输入你的操作指令（自然语言）：',
         'input_source_roots': '请输入源文件夹路径（多个路径用英文逗号分隔）：',
         'input_target_root': '请输入目标文件夹路径：',
@@ -45,19 +51,23 @@ MESSAGES = {
         'welcome': '\nWelcome to BatchGenie!',
         'menu_title': 'Please select an operation:',
         'menu_prefix': '1. Batch Add Prefix',
-        'menu_convert': '2. Batch Format Convert',
-        'menu_ai': '3. Use AI Model for Natural Language Commands',
-        'menu_audio': '4. Classify Audio Files by Sample Rate',
-        'menu_monitor': '5. Folder Monitor',
-        'menu_exit': '6. Exit',
+        'menu_suffix': '2. Batch Add Suffix',
+        'menu_convert': '3. Batch Format Convert',
+        'menu_ai': '4. Use AI Model for Natural Language Commands',
+        'menu_audio': '5. Classify Audio Files by Sample Rate',
+        'menu_monitor': '6. Folder Monitor',
+        'menu_exit': '7. Exit',
         'input_choice': 'Enter option number: ',
         'input_folder': 'Enter folder path: ',
         'input_files': 'Enter file paths (supports wildcards, separate multiple paths with commas): ',
         'input_prefix': 'Enter the prefix to add: ',
+        'input_suffix_folder': 'Enter the folder path for batch suffix addition: ',  # 更新提示
+        'input_suffix_pattern': 'Enter the file extension (e.g., txt): ',  # 更新提示
+        'input_suffix': 'Enter the suffix to add: ',  # 确保提示正确
         'input_command': 'Enter your command (in natural language): ',
         'input_source_roots': 'Enter source folder paths (separate multiple paths with commas): ',
         'input_target_root': 'Enter target folder path: ',
-        'input_file_types': 'Enter file types to monitor (e.g.,wav, separate with commas): ',
+        'input_file_types': 'Enter file types to monitor (e.g., .wav, separate with commas): ',
         'goodbye': 'Thanks for using BatchGenie, goodbye!',
         'invalid_option': 'Invalid option, please try again!',
         'operation_complete': 'Operation complete!',
@@ -83,6 +93,14 @@ def handle_prefix(msg, lang):
     file_extension = input(msg['input_prefix_pattern']).strip()  # 输入文件扩展名
     prefix = input(msg['input_prefix'])  # 输入前缀
     if add_prefix(folder_path, file_extension, prefix, lang):
+        print(msg['operation_complete'])
+
+def handle_suffix(msg, lang):
+    """处理批量添加后缀操作"""
+    folder_path = input(msg['input_suffix_folder'])  # 输入文件夹路径
+    file_extension = input(msg['input_suffix_pattern']).strip()  # 输入文件扩展名
+    suffix = input(msg['input_suffix'])  # 输入后缀
+    if add_suffix(folder_path, file_extension, suffix, lang):
         print(msg['operation_complete'])
 
 def handle_monitor(msg, lang):
@@ -114,36 +132,39 @@ def main(lang='zh'):
     while True:
         print(f"\n{msg['welcome']}")
         print(msg['menu_title'])
-        print(msg['menu_prefix'])
-        print(msg['menu_convert'])
-        print(msg['menu_ai'])
-        print(msg['menu_audio'])
-        print(msg['menu_monitor'])
-        print(msg['menu_exit'])
+        print(msg['menu_prefix'])  # 批量添加前缀
+        print(msg['menu_suffix'])  # 批量添加后缀
+        print(msg['menu_convert'])  # 批量格式转换
+        print(msg['menu_ai'])  # 使用 AI 模型解析自然语言命令
+        print(msg['menu_audio'])  # 按采样率分类音频文件
+        print(msg['menu_monitor'])  # 文件夹监控
+        print(msg['menu_exit'])  # 退出
         
         try:
             choice = int(input(msg['input_choice']))
             
             if choice == 1:  # 批量添加前缀
                 handle_prefix(msg, lang)
-            elif choice == 2:  # 格式转换
+            elif choice == 2:  # 批量添加后缀
+                handle_suffix(msg, lang)  # 调用处理后缀的函数
+            elif choice == 3:  # 批量格式转换
                 folder_path = input(msg['input_folder'])
                 batch_convert(folder_path, lang)
-            elif choice == 3:  # AI 命令
+            elif choice == 4:  # AI 命令
                 command = input(msg['input_command'])
                 interpret_and_execute(command, lang)
-            elif choice == 4:  # 音频分类
+            elif choice == 5:  # 音频分类
                 folder_path = input(msg['input_folder'])
                 classify_audio_files(folder_path, lang)
-            elif choice == 5:  # 监控
+            elif choice == 6:  # 监控
                 handle_monitor(msg, lang)
-            elif choice == 6:  # 退出
+            elif choice == 7:  # 退出
                 print(msg['goodbye'])
                 break
             else:
                 print(msg['invalid_option'])
             
-            if choice != 5:  # 监控模式不需要按回车继续
+            if choice != 6:  # 监控模式不需要按回车继续
                 input(msg['press_enter'])
                 
         except ValueError:
