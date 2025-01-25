@@ -160,15 +160,7 @@ def replace_placeholders(prompt):
 def get_ai_response(prompt, lang='zh'):
     """获取 AI 响应，带重试机制"""
     try:
-        # 替换用户目录的占位符
-        prompt = replace_placeholders(prompt)
-
-        # 检查输入是否有效
-        if not prompt or prompt.strip() == "":
-            raise ValueError("输入的提示不能为空。")
-
-        print(f"输入的提示: '{prompt}'")  # 调试输出
-
+        # 添加撤回功能的提示
         system_prompt = f"""你是一个文件管理助手。请分析用户的需求并返回结构化的 JSON 响应。
         以下是返回格式的示例：
 
@@ -197,7 +189,27 @@ def get_ai_response(prompt, lang='zh'):
             "target_dir": "C:/target/path"
         }}
 
-        4. 智能文件夹监控：
+        4. 撤回批量添加前缀操作：
+        {{
+            "operation": "remove_prefix",
+            "params": [
+                "C:/path/to/folder",
+                "txt",
+                "PREFIX_"
+            ]
+        }}
+
+        5. 撤回文件扩展名修改：
+        {{
+            "operation": "remove_rename_format",
+            "params": [
+                "C:/path/to/folder",
+                "m4a",
+                "txt"
+            ]
+        }}
+
+        6. 智能文件夹监控：
         {{
             "operation": "smart_monitor",
             "source_roots": [
@@ -208,7 +220,7 @@ def get_ai_response(prompt, lang='zh'):
             "file_types": [".wav"]
         }}
 
-        5. 删除文件：
+        7. 删除文件：
         {{
             "operation": "delete",
             "files": [
@@ -223,35 +235,14 @@ def get_ai_response(prompt, lang='zh'):
         4. 添加前缀和后缀操作的参数需要明确指定
 
         用户的请求是: {prompt}"""
-        
+
+        # 这里是与 AI 交互的逻辑
         response = model.generate_content(system_prompt)
-        response_text = response.text
-        
-        # 清理响应文本，移除可能的 Markdown 代码块标记
-        if response_text.startswith('```'):
-            response_text = response_text.split('\n', 1)[1]
-        if response_text.endswith('```'):
-            response_text = response_text.rsplit('\n', 1)[0]
-        if response_text.startswith('json'):
-            response_text = response_text.split('\n', 1)[1]
-            
-        # 移除任何行内注释
-        response_lines = response_text.split('\n')
-        cleaned_lines = []
-        for line in response_lines:
-            comment_index = line.find('#')
-            if comment_index != -1:
-                line = line[:comment_index].rstrip()
-            cleaned_lines.append(line)
-        response_text = '\n'.join(cleaned_lines)
-            
-        print(f"原始响应: {response_text}")  # 调试输出
-        return response_text
-            
+        return response.text.strip()  # 返回 AI 的响应
+
     except Exception as e:
-        print(MESSAGES[lang]['network_error'])
-        print(f"详细错误信息: {str(e)}")  # 输出详细错误信息
-        raise
+        print(f"获取 AI 响应时出错: {str(e)}")
+        return None
 
 def _normalize_path(path):
     """规范化路径字符串，处理空格和斜杠问题"""

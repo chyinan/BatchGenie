@@ -21,28 +21,20 @@ MESSAGES = {
     }
 }
 
-def batch_convert(folder_path, lang='zh'):
+def batch_convert(folder_path, original_extension, target_extension, lang='zh'):
     """批量修改文件扩展名"""
     msg = MESSAGES[lang]
     try:
         if not os.path.exists(folder_path):
             print(msg['folder_not_exist'].format(folder_path))
-            return
+            return False
             
-        source_format = input(msg['input_source_format']).strip().lower()
-        if not source_format.startswith('.'):
-            source_format = '.' + source_format
-            
-        target_format = input(msg['input_target_format']).strip().lower()
-        if not target_format.startswith('.'):
-            target_format = '.' + target_format
-        
         count = 0
         files = os.listdir(folder_path)
         for filename in files:
-            if filename.lower().endswith(source_format):
+            if filename.lower().endswith(original_extension):
                 old_path = os.path.join(folder_path, filename)
-                new_filename = filename[:-len(source_format)] + target_format
+                new_filename = filename[:-len(original_extension)] + target_extension
                 new_path = os.path.join(folder_path, new_filename)
                 os.rename(old_path, new_path)
                 print(msg['renamed'].format(filename, new_filename))
@@ -50,8 +42,11 @@ def batch_convert(folder_path, lang='zh'):
         
         if count > 0:
             print(msg['complete'].format(count))
+            return True  # 返回 True 表示成功处理文件
         else:
-            print(msg['no_files'].format(source_format))
+            print(msg['no_files'].format(original_extension))
+            return False  # 返回 False 表示没有处理文件
             
     except Exception as e:
         print(msg['error'].format(str(e)))
+        return False  # 返回 False 表示发生错误
