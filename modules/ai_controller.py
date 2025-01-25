@@ -14,6 +14,7 @@ from .prefix_handler import add_prefix
 from .file_transfer import batch_move, batch_copy
 from .file_monitor import SmartFolderMonitor  # 只导入新的监控类
 from .file_handler import batch_delete  # 添加导入
+from .suffix_handler import add_suffix  # 确保导入了 add_suffix
 
 # 配置 Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -171,16 +172,23 @@ def get_ai_response(prompt, lang='zh'):
         system_prompt = f"""你是一个文件管理助手。请分析用户的需求并返回结构化的 JSON 响应。
         以下是返回格式的示例：
 
-        1. 重命名文件：
+        1. 批量添加前缀：
         {{
-            "operation": "batch_rename",
-            "files": [
-                "C:/Users/username/Music/old.txt"
-            ],
-            "new_name": "new.txt"
+            "operation": "add_prefix",
+            "folder_path": "C:/path/to/folder",
+            "file_extension": "txt",
+            "prefix": "PREFIX_"
         }}
 
-        2. 移动文件：
+        2. 批量添加后缀：
+        {{
+            "operation": "add_suffix",
+            "folder_path": "C:/path/to/folder",
+            "file_extension": "txt",
+            "suffix": "_SUFFIX"
+        }}
+
+        3. 移动文件：
         {{
             "operation": "move",
             "files": [
@@ -189,7 +197,7 @@ def get_ai_response(prompt, lang='zh'):
             "target_dir": "C:/target/path"
         }}
 
-        3. 智能文件夹监控：
+        4. 智能文件夹监控：
         {{
             "operation": "smart_monitor",
             "source_roots": [
@@ -200,7 +208,7 @@ def get_ai_response(prompt, lang='zh'):
             "file_types": [".wav"]
         }}
 
-        4. 删除文件：
+        5. 删除文件：
         {{
             "operation": "delete",
             "files": [
@@ -208,20 +216,11 @@ def get_ai_response(prompt, lang='zh'):
             ]
         }}
 
-        5. 添加前缀：
-        {{
-            "operation": "add_prefix",
-            "files": [
-                "C:/path/to/*.txt"
-            ],
-            "prefix": "PREFIX_"
-        }}
-
         注意：
         1. 对于批量操作，请使用通配符（如 *.txt）来匹配文件
         2. 确保返回的是标准的 JSON 格式
         3. 路径中的反斜杠需要使用正斜杠替代
-        4. 删除操作需要明确指定文件类型，避免误删
+        4. 添加前缀和后缀操作的参数需要明确指定
 
         用户的请求是: {prompt}"""
         
@@ -279,15 +278,28 @@ def interpret_and_execute(prompt, lang='zh'):
             # 获取操作类型和参数
             operation = result.get('operation')
             
-            if operation == 'batch_rename':
-                files = result.get('files', [])
-                new_name = result.get('new_name')
-                if not files or not new_name:
+            if operation == 'add_prefix':
+                folder_path = result.get('folder_path')
+                file_extension = result.get('file_extension')
+                prefix = result.get('prefix')
+                if not folder_path or not file_extension or not prefix:
                     print(msg['invalid_params'])
                     return
-                if not batch_rename(files[0], new_name, lang):
+                if not add_prefix(folder_path, file_extension, prefix, lang):
                     print(msg['operation_failed'].format(operation))
                     return
+            
+            elif operation == 'add_suffix':  # 添加对批量添加后缀的支持
+                folder_path = result.get('folder_path')
+                file_extension = result.get('file_extension')
+                suffix = result.get('suffix')
+                if not folder_path or not file_extension or not suffix:
+                    print(msg['invalid_params'])
+                    return
+                if not add_suffix(folder_path, file_extension, suffix, lang):
+                    print(msg['operation_failed'].format(operation))
+                    return
+            
             elif operation == 'smart_monitor':
                 # 获取并规范化监控参数
                 source_roots = [_normalize_path(src) for src in result.get('source_roots', [])]
@@ -337,10 +349,6 @@ def interpret_and_execute(prompt, lang='zh'):
                     for monitor in monitors:
                         monitor.stop()
                     print(msg['monitoring_stopped'])
-            elif operation == 'add_prefix':
-                if not add_prefix(result.get('files', []), result.get('prefix', '')):
-                    print(msg['operation_failed'].format(operation))
-                    return
             elif operation == 'move':
                 if not batch_move(result.get('files', []), result.get('target_dir'), lang):
                     print(msg['operation_failed'].format(operation))
