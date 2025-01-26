@@ -29,6 +29,7 @@ MESSAGES = {
         'menu_monitor': '6. 文件夹监控',
         'menu_undo': '7. 撤回最后一次操作',  # 新增撤回选项
         'menu_exit': '8. 退出',
+        'monitoring_active': "文件夹监控已启动，监控文件类型: {}" ,
         'input_choice': '输入选项编号：',
         'input_folder': '请输入文件夹路径：',
         'input_files': '请输入文件路径（支持通配符，多个路径用英文逗号分隔）：',
@@ -62,6 +63,7 @@ MESSAGES = {
         'menu_audio': '5. Classify Audio Files by Sample Rate',
         'menu_monitor': '6. Folder Monitor',
         'menu_exit': '7. Exit',
+        'monitoring_active': "Folder monitoring is active, monitoring file types: {}",
         'input_choice': 'Enter option number: ',
         'input_folder': 'Enter folder path: ',
         'input_files': 'Enter file paths (supports wildcards, separate multiple paths with commas): ',

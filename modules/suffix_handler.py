@@ -55,6 +55,7 @@ def add_suffix(folder_path, file_extension, suffix, lang='zh'):
         print(msg['affected_files'])
         for file_path in files:
             new_name = os.path.splitext(file_path)[0] + suffix + os.path.splitext(file_path)[1]
+            print(f"将要重命名: {file_path} -> {new_name}")  # 添加调试信息
             print(msg['rename_preview'].format(file_path, new_name))
         
         # 请求确认

@@ -15,7 +15,8 @@ MESSAGES = {
         'processing': "正在处理文件: {}",
         'process_complete': "文件处理完成: {}",
         'error': "处理出错: {}",
-        'recursive_monitoring': "正在递归监控所有子文件夹..."
+        'recursive_monitoring': "正在递归监控所有子文件夹...",
+        'monitoring_active': "文件夹监控已启动，监控文件类型: {}"
     },
     'en': {
         'start_monitoring': "Start monitoring folder: {}",
@@ -26,7 +27,8 @@ MESSAGES = {
         'processing': "Processing file: {}",
         'process_complete': "File processing completed: {}",
         'error': "Processing error: {}",
-        'recursive_monitoring': "Recursively monitoring all subfolders..."
+        'recursive_monitoring': "Recursively monitoring all subfolders...",
+        'monitoring_active': "Folder monitoring is active, monitoring file types: {}"
     }
 }
 

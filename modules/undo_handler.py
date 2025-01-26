@@ -16,9 +16,8 @@ class UndoHandler:
             print("没有操作可以撤回。")
             return
 
+        print(f"上一次操作: {self.last_operation}")  # 添加调试信息
         operation_type, params = self.last_operation
-        print(f"上一次操作: {operation_type}，参数: {params}")
-
         # 获取受影响的文件列表
         affected_files = self.get_affected_files(operation_type, params)
         if not affected_files:
@@ -79,7 +78,9 @@ class UndoHandler:
         elif operation_type == "remove_suffix":
             suffix = params[2]
             for filename in os.listdir(folder_path):
+                # 检查文件名是否以后缀结尾
                 if filename.lower().endswith(f"{suffix}.{file_extension}"):
+                    # 计算原始文件名
                     old_name = filename[:-len(suffix)] + f".{file_extension}"
                     affected_files.append(
                         (os.path.join(folder_path, old_name), os.path.join(folder_path, filename))
